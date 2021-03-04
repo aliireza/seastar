@@ -905,7 +905,11 @@ if (Seastar_DPDK)
 
   # This just provides the include path to cmake
   target_link_libraries (seastar
-    PUBLIC dpdk::dpdk)
+    PUBLIC
+      dpdk::dpdk
+      ibverbs
+      mnl
+      mlx5)
 endif ()
 
 if (Seastar_HWLOC)

@@ -58,6 +58,8 @@ debian_packages=(
     doxygen
     openssl
     pkg-config
+    numactl
+    lksctp-tools
 )
 
 # seastar doesn't directly depend on these packages. They are

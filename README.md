@@ -46,7 +46,9 @@ sudo ./install-dependencies.sh
 ninja -C build/release
 ```
 
-**Note that you might still get some errors, due to missing packages/libraries. Most of them can be solved via `apt-get`, but you can also add extra `--cook` flags to resolve extra dependencies, check `./cooking.sh` for more info.**
+Note that you might still get some errors, due to missing packages/libraries. Most of them can be solved via `apt-get`, but you can also add extra `--cook` flags to resolve extra dependencies, check `./cooking.sh` for more info.
+
+**Since using `--cook` calls the `./cooking.sh`, you can manually check for errors if a `--cook` command fails. For example, try `./cooking.sh -e Boost` or `./cooking.sh -e hwloc`.**
 
 ## Running Memcached
 

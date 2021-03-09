@@ -64,11 +64,11 @@ sudo build/release/apps/memcached/memcached --network-stack native --dpdk-pmd --
 
 ## Running Benchmark
 
-This section summarizes some of popular benchmarks for memcached. For offical Seastar Memcached benchmarking guidelines refer to [here](seastar-memcached-benchmark).
+This section summarizes some of popular benchmarks for memcached. For offical Seastar Memcached benchmarking guidelines refer to [here][seastar-memcached-benchmark].
 
 ### Memslap/Memaslap (libmemcached)
 
-You can use [memslap](memslap-page) and/or [memaslap](memaslap-page), which are popular tools provided by [libmemcached](libmemcached-page), to benchmark a memcached server. To setup memaslap, run the following commands:
+You can use [memslap][memslap-page] and/or [memaslap][memaslap-page], which are popular tools provided by [libmemcached][libmemcached-page], to benchmark a memcached server. To setup memaslap, run the following commands:
 
 ```bash
 sudo apt-get install python3-sphinx bison flex libevent-dev
@@ -80,7 +80,7 @@ make
 sudo make install
 ```
 
-- If you could not find `memaslap`, check [here](libmemcached-bugs).
+- If you could not find `memaslap`, check [here][libmemcached-bugs].
 
 - You might need to fix some compilation errors, depending on your compiler version.
 
@@ -95,7 +95,7 @@ memaslap -s 192.168.101.13:11211 -t 60s -T 1 -c 60 -X 64
 
 ### YCSB
 
-You can use YCSB to benchmark memcached. To setup YCSB, you can run the following commands:
+You can use [YCSB][ycsb-repo] to benchmark memcached. To setup YCSB, you can run the following commands:
 
 ```bash
 sudo apt install maven 
@@ -106,12 +106,12 @@ mvn -pl site.ycsb:memcached-binding -am clean package
 
 A sample command to run YCSB could be: `./bin/ycsb load memcached -s -P workloads/workloada -p "memcached.hosts=192.168.101.13"` 
 
-**For more information, please refer to this [page](ycsb-memcached).**
+**For more information, please refer to this [page][ycsb-memcached].**
 
 
 ### Mutilate
 
-[Mutilate](mutilate-page) is a open-loop load generator for memcached. To setup mutilate, run the following commands:
+[Mutilate][mutilate-page] is a open-loop load generator for memcached. To setup mutilate, run the following commands:
 
 ```bash
 sudo apt-get install scons libevent-dev gengetopt libzmq3-dev
@@ -128,7 +128,7 @@ To run mutilate, you can run the following command:
 
 ### Cloud Suite (Data Caching)
 
-You can also use [cloud suite](cloud-suite-page) to benchmark memcached by using Twitter dataset.
+You can also use [cloud suite][cloud-suite-page] to benchmark memcached by using Twitter dataset.
 
 You can setup cloud-suite benchmarking tool via docker containers or by running the following commands:
 
@@ -139,13 +139,14 @@ cd memcached/
 make
 ```
 
-For more information, please refer to [their repository](cloud-suite-data-caching).
+For more information, please refer to [their repository][cloud-suite-data-caching].
 
 [seastar-memcached-benchmark]: https://github.com/scylladb/seastar/wiki/Memcached-Benchmark
 [memslap-page]: http://docs.libmemcached.org/bin/memslap.html
 [memaslap-page]: http://docs.libmemcached.org/bin/memaslap.html
 [libmemcached-page]:https://libmemcached.org/libMemcached.html
 [libmemcached-bugs]: https://bugs.launchpad.net/libmemcached/+bug/1562677
+[ycsb-repo]: https://github.com/brianfrankcooper/YCSB
 [ycsb-memcached]: https://github.com/brianfrankcooper/YCSB/tree/master/memcached
 [mutilate-page]: https://github.com/leverich/mutilate
 [cloud-suite-page]: https://www.cloudsuite.ch/

@@ -141,6 +141,25 @@ make
 
 For more information, please refer to [their repository][cloud-suite-data-caching].
 
+## Memcached SR
+
+You can try Memcached SR that uses `SO_REUSEPORT` socket option to scale with the number of threads. This modified version of Memcached has been proposed by [BMC paper][BMC-paper] and achieves much better performance compared to the native Memcached. You can install and run Memcached SR as follows:
+
+```bash
+git clone https://github.com/Orange-OpenSource/bmc-cache.git
+cd memcached-sr 
+./autogen.sh
+CC=clang CFLAGS='-DREUSEPORT_OPT=1 -Wno-deprecated-declarations' ./configure && make
+./memcached
+```
+
+**Note that you need at least clang 9.**
+
+
+Please check their GitHub [repository][BMC-repo] for more information.
+
+
+
 [seastar-memcached-benchmark]: https://github.com/scylladb/seastar/wiki/Memcached-Benchmark
 [memslap-page]: http://docs.libmemcached.org/bin/memslap.html
 [memaslap-page]: http://docs.libmemcached.org/bin/memaslap.html

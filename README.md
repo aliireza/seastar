@@ -170,3 +170,5 @@ Please check their GitHub [repository][BMC-repo] for more information.
 [mutilate-page]: https://github.com/leverich/mutilate
 [cloud-suite-page]: https://www.cloudsuite.ch/
 [cloud-suite-data-caching]: https://github.com/parsa-epfl/cloudsuite/blob/master/docs/benchmarks/data-caching.md
+[BMC-paper]: https://www.usenix.org/conference/nsdi21/presentation/ghigoff
+[BMC-repo]: https://github.com/Orange-OpenSource/bmc-cache

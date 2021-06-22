@@ -1,0 +1,233 @@
+%info
+Benchmarking Memcached performance
+
+%config
+timeout=600
+
+accept_zero={EL.*,EL,LLC-loads-*,LLC-load-misses-*,LLCOCCUPANCY-*,MBR-*,MBL-*,LLCMISSES-*}
+
+graph_series_sort=-avg
+
+%variables
+
+//Memcached
+CORES=1
+coretune:CORES=[1-8]
+FREQ=2300
+freqtune:FREQ={1200,1400,1600,1800,2000,2200,2400,2600,2800,3000}
+UNCORE_FREQ=24 // min is 12 (1.2GHz) and max is 24 (2.4GHz)
+uncoretune:UNCORE_FREQ={12,14,16,18,20,22,24}
+SRV_IP=192.168.101.13
+
+//YCSB
+GEN_CONCURRENT=32
+RECORD=10000000
+OP=1000000
+WORKLOAD=a
+FIELD_LENGTH=32
+FIELD_LENGTH_MIN=32
+FIELD_PER_REQ=1
+KEY_ORDER=hashed //hashed or ordered
+
+// PQOS variables
+PQOS_OUTPUT=pqos.log
+PQOS_MAX_CORE=18
+
+
+%pqos:script@dut sudo=true name=profiler autokill=false waitfor=GEN_BEGIN delay=0
+
+// Enabling MSR
+modprobe msr 
+
+// Setup CAT configuration
+echo "Resetting CAT"
+pqos -R
+
+// Run PQOS monitoring
+bash pqos.sh
+
+%pqos:script@dut sudo=true name=pqos-parser autokill=true waitfor=GEN_DONE delay=0
+
+// Processing pqos output
+echo "Launching PQOS script"
+bash pqos-processing.sh $PQOS_OUTPUT
+rm -f $PQOS_OUTPUT
+
+
+%file@dut pqos.sh
+
+#============================================================================================#
+# pqos.sh : Script to launch pqos
+#============================================================================================#
+
+echo "Launching PQOS"
+pqos -m "all:0-$(($CORES))" -o $PQOS_OUTPUT
+
+
+#============================================================================================#
+
+
+%file@dut pqos-processing.sh
+
+#============================================================================================#
+# pqos-processing.sh : Script to process pqos output to get LLC misses and other events
+#============================================================================================#
+
+input_file=$1
+monitoring_cores=$(seq 0 ${CORES})
+column=$(seq 2 6)
+column_name=("NA" "RESULT-CORE" "RESULT-IPC" "RESULT-LLCMISSES" "RESULT-LLCOCCUPANCY" "RESULT-MBL" "RESULT-MBR")
+column_scale=(" " " " " " "k" "KB" "MB/s" "MB/s")
+
+
+for c in $monitoring_cores; do
+	for col in $column;do
+
+	#Sum
+	result=`cat $input_file\
+	| awk -v core=$c '{if($1!="TIME" && $1==core) print $0}'\
+	| awk -v column=$col '{print $column}'\
+	| awk '{ total +=$1;count++;} END{print total}'`
+	echo ${column_name[$col]}"-sum-C"$c" "$result" "${column_scale[$col]}
+
+	#Average
+	result=`cat $input_file\
+	| awk -v core=$c '{if($1!="TIME" && $1==core) print $0}'\
+	| awk -v column=$col '{print $column}'\
+	| awk '{ total +=$1;count++;} END{print total/count}'`
+	echo ${column_name[$col]}"-avg-C"$c" "$result" "${column_scale[$col]}
+
+	# #Median
+	# result=`cat $input_file\
+	# | awk -v core=$c '{if($1!="TIME" && $1==core) print $0}'\
+	# | awk -v column=$col '{print $column}'\
+	# | awk 'BEGIN{max=0}{if ($1>max) max=$1; fi} END{print max/1k}'\
+	# | sort -n \
+	# | awk '{ a[i++]=$1; }END { x=int((i+1)/2); if (x < (i+1)/2) print (a[x-1]+a[x])/2; else print a[x-1];}'`
+	# echo ${column_name[$col]}"-median-C"$c" "$result" "${column_scale[$col]}
+
+	# #Maximum
+	# result=`cat $input_file\
+	# | awk -v core=$c '{if($1!="TIME" && $1==core) print $0}'\
+	# | awk -v column=$col '{print $column}'\
+	# | awk 'BEGIN{max=0}{if ($1>max) max=$1; fi} END{print max/1k}'`
+	# echo ${column_name[$col]}"-max-C"$c" "$result" "${column_scale[$col]}
+	
+	done
+done
+
+#============================================================================================//
+# dut: Frequency
+#============================================================================================//
+
+
+%script@dut sudo=true autokill=false waitfor=READY delay=0
+
+// Set processor frequency
+echo "Setting cpu frequency of 0-\$(( $(nproc) - 1))"
+sudo cpupower --cpu 0-\$(( $(nproc) - 1)) frequency-set -d ${FREQ}M -u ${FREQ}M
+
+// Enabling MSR
+modprobe msr
+
+// Set uncore frequency
+uncore_value=$(( ($UNCORE_FREQ << 8 ) +  $UNCORE_FREQ))
+echo "Setting Uncore Frequency to $(( $UNCORE_FREQ / 10))GHz"
+printf 'Setting UNCORE_RATIO_LIMIT to 0x%x\n' $uncore_value
+wrmsr 0x620 $uncore_value
+
+
+//============================================================================================//
+// dut: Memcached Seastar
+//============================================================================================//
+
+
+%seastar:script@dut sudo=true autokill=false
+cd ${SEASTAR_PATH}
+echo "EVENT READY"
+
+killall memcached
+core_set=`for i in $(seq 0 $((${CORES}-1))); do echo -n $i","; done |sed 's/.$//'`
+echo $core_set
+build/release/apps/memcached/memcached --network-stack native --dpdk-pmd --dhcp 0 --host-ipv4-addr ${SRV_IP} --netmask-ipv4-addr 255.255.255.0 --port 11211 --collectd 0 --cpuset $core_set --dpdk-port-index 0 --thread-affinity 1 --stats
+
+
+//============================================================================================//
+// dut: Memcached SR
+//============================================================================================//
+
+
+%-seastar,sr:script@dut sudo=true autokill=false 
+cd ${MEMCACHED_SR_PATH}
+echo "EVENT READY"
+
+killall memcached
+core_set=`for i in $(seq 0 $((${CORES}-1))); do echo -n $i","; done |sed 's/.$//'`
+echo $core_set
+taskset -c ${core_set} ./memcached -l ${SRV_IP} -t ${CORES} -u alireza
+
+
+
+
+//============================================================================================//
+// client: YCSB
+//============================================================================================//
+
+
+%-mutilate,ycsb:script@client sudo=true autokill=false delay=3
+cd ${YCSB_PATH}
+
+th=$GEN_CONCURRENT
+nop=$OP
+record=$RECORD
+wl=$WORKLOAD
+
+echo "Loading YCSB"
+./bin/ycsb run memcached -s -P workloads/workload${wl} -p "memcached.hosts=${SRV_IP}" -p operationcount=${nop} -p recordcount=$record -p minfieldlength=${FIELD_LENGTH_MIN} -p fieldcount=${FIELD_PER_REQ} -p fieldlength=${FIELD_LENGTH} -p insertorder=${KEY_ORDER} -threads $th 2>&1 | tee results_load
+
+
+
+echo "Running YCSB"
+echo "EVENT GEN_BEGIN"
+
+./bin/ycsb run memcached -s -P workloads/workload${wl} -p "memcached.hosts=${SRV_IP}" -p operationcount=${nop} -p recordcount=$record -p minfieldlength=${FIELD_LENGTH_MIN} -p fieldcount=${FIELD_PER_REQ} -p fieldlength=${FIELD_LENGTH} -p insertorder=${KEY_ORDER} -threads $th 2>&1 | tee results
+ops=$(cat results | grep "\[OVERALL\], Throughput" | cut -d' ' -f 3)
+lat99_read=$(cat results | grep "\[READ\], 99thPercentileLatency" | cut -d' ' -f 3)
+lat95_read=$(cat results | grep "\[READ\], 95thPercentileLatency" | cut -d' ' -f 3)
+latavg_read=$(cat results | grep "\[READ\], AverageLatency" | cut -d' ' -f 3)
+echo "RESULT-MEM_OPS ${ops}"
+echo "RESULT-LAT99 ${lat99_read}"
+echo "RESULT-LAT95 ${lat95_read}"
+echo "RESULT-LATENCY ${latavg_read}"
+echo "EVENT GEN_DONE"
+
+
+//============================================================================================//
+// client: Mutilate
+//============================================================================================//
+
+
+%-ycsb,mutilate:script@client sudo=false autokill=false delay=3
+cd ${MUTILATE_PATH}
+
+th=$GEN_CONCURRENT
+record=$RECORD
+wl=0.1
+time=10
+warmup=5
+connections=32
+
+echo "Running Mutilate"
+echo "EVENT GEN_BEGIN"
+
+unbuffer taskset -c 0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30 /home/alireza/kvs-project/mutilate/mutilate -s ${SRV_IP} -T 32 -c ${connections} -r ${record} -i fb_ia -K fb_key -V fb_value -w ${warmup} -u ${wl} -t $time -v 2>&1 > results
+
+echo "EVENT GEN_DONE"
+ops=$(cat results | grep QPS | awk '{print $4}')
+lat99_read=$(cat results | | grep read | awk '{print $9}')
+lat95_read=$(cat results | grep read | awk '{print $8}')
+latavg_read=$(cat results | grep read | awk '{print $2}')
+echo "RESULT-MEM_OPS ${ops}"
+echo "RESULT-LAT99 ${lat99_read}"
+echo "RESULT-LAT95 ${lat95_read}"
+echo "RESULT-LATENCY ${latavg_read}"
